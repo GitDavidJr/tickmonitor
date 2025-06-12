@@ -1,52 +1,33 @@
 "use client";
 
-import * as React from "react";
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 
-// @ts-ignore
-import * as snmp from "net-snmp";
+import Image from 'next/image';
+import React, { useEffect, useState } from 'react';
+import { Area, AreaChart, CartesianGrid, XAxis } from 'recharts';
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+    ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent
+} from '@/components/ui/chart';
 import {
-  ChartConfig,
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
 
-export const description = "An interactive area chart";
-
-//formato do item q precisa retornar na função
 type ChartItem = {
   datetime: string;
   input: number;
   output: number;
-  inputDelta?: number;
-  outputDelta?: number;
+  rx?: number;
+  tx?: number;
 };
 
-//calcula a diferença entre os valores
+
 function calculateDeltas(data: ChartItem[]): ChartItem[] {
   if (data.length === 0) return [];
 
   return data.map((item, index) => {
     if (index === 0) {
-      return { ...item, inputDelta: 0, outputDelta: 0 };
+      return { ...item, rx: 0, tx: 0 };
     }
 
     const timeDiffMs =
@@ -57,13 +38,13 @@ function calculateDeltas(data: ChartItem[]): ChartItem[] {
 
     return {
       ...item,
-      inputDelta: (item.input - data[index - 1].input) / seconds,
-      outputDelta: (item.output - data[index - 1].output) / seconds,
+      rx: (item.input - data[index - 1].input) / seconds,
+      tx: (item.output - data[index - 1].output) / seconds,
     };
   });
 }
 
-//configuração de lines do grafico
+
 const chartConfig = {
   input: {
     label: "Input",
@@ -75,45 +56,22 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-//intervalo de tempo para atualização
-const INTERVAL_MS = 10000;
+
+const INTERVAL_MS = 5000;
 
 export function ChartAreaInteractive() {
-  //estado do grafico com inicio com a função que falei q poderia substituir pela informação do banco de dados
-  const [chartData, setChartData] = React.useState<ChartItem[]>([]);
+  
+  const [chartData, setChartData] = useState<ChartItem[]>([]);
 
-  const [timeRange, setTimeRange] = React.useState("10m");
 
-  React.useEffect(() => {
+
+  useEffect(() => {
     const intervalId = setInterval(async () => {
       try {
-        const session = snmp.createSession("192.168.89.1", "public");
-          const oids = [
-            "1.3.6.1.2.1.2.2.1.10.3",  // input
-            "1.3.6.1.2.1.2.2.1.16.3",  // output
-          ];
-        
-          
-            const result = await new Promise<{ input: number; output: number }>((resolve, reject) => {
-              session.get(oids, (error: any, varbinds: any[]) => {
-                session.close();
-                if (error) return reject(error);
-                const input = varbinds[0].value as number;
-                const output = varbinds[1].value as number;
-                resolve({ input, output });
-              });
-            });
-        
-            const datetime = new Date().toISOString().slice(0, 19);
-        
-            console.log("result", result);
-        
-            const response = {
-              datetime,
-              ...result,
-            }
+        const response = await fetch("/api/snmp");
+        const data = await response.json();
 
-        const newItem: ChartItem = response; 
+        const newItem: ChartItem = data;
 
         setChartData((prevData) => {
           const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
@@ -130,58 +88,21 @@ export function ChartAreaInteractive() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Filtra dados conforme o timeRange selecionado
-  const now = Date.now();
-  const filteredData = chartData.filter((item) => {
-    const date = new Date(item.datetime).getTime();
-
-    let timeLimit = 10 * 60 * 1000; // padrão: 10 minutos
-
-    if (timeRange === "1h") {
-      timeLimit = 60 * 60 * 1000;
-    } else if (timeRange === "1d") {
-      timeLimit = 24 * 60 * 60 * 1000;
-    } else if (timeRange === "7d") {
-      timeLimit = 7 * 24 * 60 * 60 * 1000;
-    }
-
-    return now - date <= timeLimit;
-  });
-
-  const dataWithDeltas = calculateDeltas(filteredData);
+  const dataWithDeltas = calculateDeltas(chartData);
 
   return (
     <Card className="h-full flex flex-col justify-center">
       <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row mb-auto">
         <div className="grid flex-1 gap-1">
-          <CardTitle>Tick Monitor</CardTitle>
+          <CardTitle>
+            <Image src="/logo.png" alt="logo" width={200} height={20} />
+          </CardTitle>
           <CardDescription>
             A simple tool to track real-time upload and download traffic from
             your MikroTik router interfaces.
           </CardDescription>
         </div>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger
-            className="hidden w-[160px] rounded-lg sm:ml-auto sm:flex"
-            aria-label="Select a value"
-          >
-            <SelectValue placeholder="Select time range" />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            <SelectItem value="10m" className="rounded-lg">
-              Last 10 minutes
-            </SelectItem>
-            <SelectItem value="1h" className="rounded-lg">
-              Last hour
-            </SelectItem>
-            <SelectItem value="1d" className="rounded-lg">
-              Last day
-            </SelectItem>
-            <SelectItem value="7d" className="rounded-lg">
-              Last week
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        
       </CardHeader>
 
       <CardContent className="flex-grow py-10 h-[350px]">
@@ -225,7 +146,7 @@ export function ChartAreaInteractive() {
               minTickGap={32}
               tickFormatter={(value) => {
                 const date = new Date(value);
-                return date.toLocaleTimeString("en-US", { hour12: false }); // HH:mm:ss
+                return date.toLocaleTimeString("en-US", { hour12: false });
               }}
             />
             <ChartTooltip />
@@ -249,13 +170,13 @@ export function ChartAreaInteractive() {
               indicator="dot"
             />
             <Area
-              dataKey="inputDelta"
+              dataKey="rx"
               type="natural"
               fill="url(#fillInput)"
               stroke="var(--color-input)"
             />
             <Area
-              dataKey="outputDelta"
+              dataKey="tx"
               type="natural"
               fill="url(#fillOutput)"
               stroke="var(--color-output)"

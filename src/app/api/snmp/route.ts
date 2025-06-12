@@ -1,6 +1,6 @@
+// @ts-expect-error
+import * as snmp from 'net-snmp';
 import { NextResponse } from 'next/server';
-// @ts-ignore
-import * as snmp from "net-snmp";
 
 export async function GET() {
   console.log("GET /api/snmp chamado");
