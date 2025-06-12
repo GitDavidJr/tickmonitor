@@ -7,8 +7,8 @@ export async function GET() {
 
   const session = snmp.createSession("192.168.89.1", "public");
   const oids = [
-    "1.3.6.1.2.1.2.2.1.10.3",  // input
-    "1.3.6.1.2.1.2.2.1.16.3",  // output
+    "1.3.6.1.2.1.2.2.1.10.4",  // input
+    "1.3.6.1.2.1.2.2.1.16.4",  // output
   ];
 
   try {
